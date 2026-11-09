@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102b4e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Badminton">
+<title>Badminton Stats</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#101828;font-family:Arial,Helvetica,sans-serif;padding:14px}
+.sheet{max-width:1150px;margin:0 auto;background:#fff;border:1px solid #c8d0da;box-shadow:0 5px 22px #162c4618}
+.top{background:#102b4e;color:#fff;text-align:center;font-weight:800;font-size:clamp(25px,5vw,48px);padding:18px 8px;letter-spacing:.2px}
+.section{background:#102b4e;color:#fff;text-align:center;font-size:clamp(20px,3.5vw,32px);font-weight:800;padding:8px}
+.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:600px}td,th{border:1.5px solid #151515;text-align:center;padding:7px 5px;height:48px;font-size:clamp(16px,2.5vw,26px)}
+th{background:#c6dcf8;font-weight:800}.player{font-weight:800}.editable{background:#fff;cursor:text;outline:none;font-weight:650}.editable:focus{box-shadow:inset 0 0 0 3px #3b82f6;background:#f4f8ff}.percent{background:#d9f0d8;font-weight:800}.losspercent{background:#f5d5d5;font-weight:800}.mutedcell{color:#111}
+.spacer{height:20px;background:#fff;border:0}
+.tools{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;padding:13px;background:#f7f9fc;border-top:1px solid #d5dce6}
+button{border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;background:#102b4e;color:white}
+button.light{background:#e4ebf5;color:#183653}button.red{background:#fbe4e4;color:#9d2222}
+.note{text-align:center;color:#5c6878;font-size:13px;padding:8px 12px 13px}
+@media(max-width:650px){body{padding:5px}.top{padding:14px 5px}.section{padding:8px}td,th{height:42px;padding:5px 3px}.tools{padding:10px 6px}}
+@media print{body{background:#fff;padding:0}.sheet{box-shadow:none;border:0}.tools,.note{display:none}.editable:focus{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="top">🏸 Badminton Stats 🏸</div>
+  <div class="tablewrap">
+    <table aria-label="Overall player stats">
+      <colgroup><col style="width:23%"><col style="width:20%"><col style="width:20%"><col style="width:19%"><col style="width:18%"></colgroup>
+      <thead><tr><th>Player</th><th>Wins</th><th>Losses</th><th>Win %</th><th>Loss %</th></tr></thead>
+      <tbody id="overall"></tbody>
+    </table>
+  </div>
+  <div class="section">Head-to-Head Wins</div>
+  <div class="tablewrap"><table id="winTable"></table></div>
+  <div class="section">Head-to-Head Losses</div>
+  <div class="tablewrap"><table id="lossTable"></table></div>
+  <div class="tools">
+    <button id="save">Save changes</button>
+    <button class="light" id="names">Edit player names</button>
+    <button class="light" id="reset">Reset to original numbers</button>
+    <button class="light" id="print">Print / Save as PDF</button>
+    <button class="red" id="clear">Clear all numbers</button>
+  </div>
+  <div class="note">Tap any number to edit it directly. Percentages update automatically. Changes are saved on this device.</div>
+</div>
+<script>
+const KEY='badminton-same-sheet-v1';
+const original={players:['Devansh','Ishan','Naitik'],wins:[3,3,2],losses:[1,1,2],
+ hw:[[null,1,1],[1,null,1],[1,1,null]],
+ hl:[[null,1,1],[1,null,1],[1,1,null]]};
+let state=read();
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function read(){try{let s=JSON.parse(localStorage.getItem(KEY));if(s&&s.players?.length===3&&s.wins?.length===3&&s.losses?.length===3&&s.hw?.length===3&&s.hl?.length===3)return s}catch(e){}return clone(original)}
+function persist(){localStorage.setItem(KEY,JSON.stringify(state))}
+function safe(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function pct(a,b){let n=a+b;return n?(a/n*100).toFixed(2)+'%':'0.00%'}
+function editCell(value,kind,i,j){let attr=`contenteditable="true" inputmode="numeric" spellcheck="false" class="editable"`;return `<td ${attr} data-kind="${kind}" data-i="${i}" ${j===undefined?'':`data-j="${j}"`}>${value??''}</td>`}
+function render(){
+ let body='';
+ for(let i=0;i<3;i++)body+=`<tr><td class="player">${safe(state.players[i])}</td>${editCell(state.wins[i],'wins',i)}${editCell(state.losses[i],'losses',i)}<td class="percent" id="wp${i}">${pct(state.wins[i],state.losses[i])}</td><td class="losspercent" id="lp${i}">${pct(state.losses[i],state.wins[i])}</td></tr>`;
+ document.getElementById('overall').innerHTML=body;
+ drawMatrix('winTable','hw');drawMatrix('lossTable','hl');
+}
+function drawMatrix(id,key){let h='<thead><tr><th>Player</th>'+state.players.map(p=>`<th>vs ${safe(p)}</th>`).join('')+'</tr></thead><tbody>';
+ for(let i=0;i<3;i++){h+=`<tr><td class="player">${safe(state.players[i])}</td>`;for(let j=0;j<3;j++)h+=i===j?'<td>-</td>':editCell(state[key][i][j],key,i,j);h+='</tr>'}
+ document.getElementById(id).innerHTML=h+'</tbody>';
+}
+function num(v){let n=Number(String(v).trim());return Number.isFinite(n)&&n>=0?Math.floor(n):0}
+document.addEventListener('focusout',e=>{let el=e.target;if(!el.matches('.editable'))return;let {kind,i,j}=el.dataset;i=Number(i);if(kind==='wins'||kind==='losses')state[kind][i]=num(el.textContent);else state[kind][i][Number(j)]=num(el.textContent);render();persist()});
+document.addEventListener('keydown',e=>{if(e.target.matches('.editable')&&e.key==='Enter'){e.preventDefault();e.target.blur()}});
+document.getElementById('save').onclick=()=>{persist();alert('Your changes are saved.')};
+document.getElementById('names').onclick=()=>{let names=state.players.map((p,i)=>{let n=prompt('Enter name for player '+(i+1),p);return n===null?p:(n.trim()||p)});if(new Set(names.map(n=>n.toLowerCase())).size!==3){alert('Player names must be different.');return}state.players=names;persist();render()};
+document.getElementById('reset').onclick=()=>{if(confirm('Restore the original numbers shown in the example?')){state=clone(original);persist();render()}};
+document.getElementById('clear').onclick=()=>{if(confirm('Set all wins, losses and head-to-head counts to zero?')){state.wins=[0,0,0];state.losses=[0,0,0];state.hw=state.hw.map((r,i)=>r.map((v,j)=>i===j?null:0));state.hl=state.hl.map((r,i)=>r.map((v,j)=>i===j?null:0));persist();render()}};
+document.getElementById('print').onclick=()=>window.print();
+render();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+</script>
+</body>
+</html>
